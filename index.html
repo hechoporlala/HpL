@@ -85,27 +85,14 @@ function vista(){const all=D.ped.map((p,i)=>({...p,_i:i}));
   pg.map(x=>`<div class="cd r" onclick="delPag(${x.rP||0},'${esc(x.o)}','${esc(x.p)}',${x.m})"><div><b>${esc(x.o)}</b><div class="m">${fd(x.f)} · ${esc(x.p)}${x.md?' · '+esc(x.md):''}</div></div><div style="text-align:right"><b>${fm(x.m)}</b><div class="m" style="color:var(--bad);font-size:11px">Tocá para borrar 🗑</div></div></div>`).join('')+
   (sin.length?vacioL('Para guardar el pago en cada pedido, agregá en tu Excel las columnas '+sin.join(' y ')+'.'):'')}
  if(tab=='his'){
-  const l=all.filter(p=>p.e=='Completada'&&p.en=='Hecha'&&p.pa=='Hecha');
-  if(!l.length) return `<h2>Historial (Finalizados)</h2>`+vacioL('No hay pedidos completados y entregados aún');
-  const gr={};
-  l.forEach(p=>{
-   const f=p.fp||p.fe||'';
-   const k=f.length>=7?f.slice(0,7):'Sin fecha';
-   if(!gr[k])gr[k]=[];
-   gr[k].push(p);
-  });
-  const sk=Object.keys(gr).sort().reverse();
-  let html=`<h2>Historial (Finalizados) <span class="m">${l.length}</span></h2>`;
-  sk.forEach(k=>{
-   let lbl='Sin fecha';
-   if(k!=='Sin fecha'){const[y,m]=k.split('-').map(Number);lbl=`${NM[m-1]} ${y}`;}
-   html+=`<div style="margin:14px 0 6px;font-weight:700;color:var(--ac);border-bottom:1px solid #44403c;padding-bottom:4px">${lbl} (${gr[k].length})</div>`;
-   html+=gr[k].slice().reverse().map(p=>{
-    const tot=precioTot(p);
-    return card(p,`Total: ${fm(tot)}${p.fe?' · Entregado: '+fd(p.fe):''}`);
-   }).join('');
-  });
-  return html;
+  const[y,m]=mes.split('-').map(Number);
+  const l=all.filter(p=>p.e=='Completada'&&p.en=='Hecha'&&p.pa=='Hecha'&&((p.fp||p.fe||'').startsWith(mes)||(!p.fp&&!p.fe&&mes===hoy().slice(0,7))));
+  const t=l.reduce((s,p)=>s+precioTot(p),0);
+  return `<div class="r" style="margin-bottom:10px"><button style="width:56px;margin:0" onclick="mv(-1)">‹</button><b>${NM[m-1]} ${y}</b><button style="width:56px;margin:0" onclick="mv(1)">›</button></div><div class="cd"><div class="m">Total Trabajos Entregados</div><div class="big pos">${fm(t)}</div><div class="m">${l.length} pedido(s) en este mes</div></div>`+
+  (l.slice().reverse().map(p=>{
+   const tot=precioTot(p);
+   return card(p,`Total: ${fm(tot)}${p.fe?' · Entregado: '+fd(p.fe):''}`);
+  }).join('')||vacioL('No hay pedidos finalizados en este mes'));
  }
  return `<h2>Inventario</h2><input placeholder="Buscar…" oninput="bus(this.value)">`+D.inv.map((x,i)=>`<div class="cd ci" data-s="${esc((x.nom+' '+x.mat).toLowerCase())}" onclick="edI(${i})"><div class="r"><b>${esc(x.nom)}</b><span class="ch c4" style="margin:0">${esc(x.mat)}</span></div><div class="m">${esc(x.can)}${x.pre?' · '+fm(x.pre):''}${x.fec?' · '+fd(x.fec):''}</div></div>`).join('')}
 const NM=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -165,7 +152,7 @@ function sv(){
   if($('#pg_m'))$('#pg_m').value='';
  }
 
- S('q',q);S('D',D);render();toast('Guardado con éxito ✓');sync();
+ S('q',q);S('D',D);cerrar();render();toast('Guardado con éxito ✓');sync();
 }
 
 function delP(){if(!confirm('¿Seguro que querés borrar este pedido de la lista?'))return;
@@ -204,7 +191,7 @@ function svI(){const v={nom:$('#i_n').value.trim(),mat:$('#i_m').value,can:$('#i
  if(cur.nw){q.push({a:'invnuevo',id:uid(),c:v});D.inv.push({r:0,...v,pre:+v.pre||0});cur.nw=false}
  else{const o=cur.o,c={};for(const k in v)if(String(v[k])!==String(o[k]||''))c[k]=v[k];
   if(Object.keys(c).length){q.push({a:'inveditar',id:uid(),r:o.r,ver:o.nom,c});const i=D.inv.findIndex(x=>x.r==o.r&&x.nom==o.nom);if(i>=0)Object.assign(D.inv[i],c,c.pre!==undefined?{pre:+c.pre||0}:{})}}
- S('q',q);S('D',D);render();toast('Guardado con éxito ✓');sync()}
+ S('q',q);S('D',D);cerrar();render();toast('Guardado con éxito ✓');sync()}
 
 $('#fab').onclick=()=>tab=='i'?edI(-1):ed(-1);
 $('#gear').onclick=()=>{abrir(`<h3 style="margin:0 0 12px">Ajustes</h3><div class="m" style="margin-bottom:10px">Se guardan solo en este teléfono.</div>${inp('URL de la app web (termina en /exec)','s_u',cfg.url||'')}${inp('Clave','s_k',cfg.t||'','password')}${inp('Valor de tu hora ($)','s_h',cfg.ph?fmtNum(cfg.ph):'','text','inputmode="numeric" oninput="fmtInp(this)"')}${inp('Packaging ($)','s_p',cfg.pk?fmtNum(cfg.pk):'$ 0','text','inputmode="numeric" oninput="fmtInp(this)"')}<button class="pri" onclick="gc()">Guardar</button><button onclick="cerrar()">Cerrar</button>`)};
