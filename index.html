@@ -43,6 +43,9 @@ label{font-size:13px;color:var(--mut);display:block;margin:2px 0 4px}
 <script>
 const $=s=>document.querySelector(s),L=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}},S=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const parseNum=v=>+String(v).replace(/\D/g,'')||0;
+const fmtNum=v=>{const n=parseNum(v);return n?'$ '+n.toLocaleString('es-AR'):''};
+const fmtInp=el=>{el.value=fmtNum(el.value)};
 const fm=n=>(+n||0).toLocaleString('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0});
 const p2=n=>String(n).padStart(2,'0'),hoy=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 const fd=f=>f?f.split('-').reverse().slice(0,2).join('/'):'',uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -71,7 +74,9 @@ function vista(){const all=D.ped.map((p,i)=>({...p,_i:i}));
    return card(p,`Cobrado: ${fm(rec)} / ${fm(tot)} · <b class="neg">Deuda: ${fm(r)}</b>`);
   }).join('')||vacioL('Todo cobrado 🎉'))}
  if(tab=='m'){const[y,m]=mes.split('-').map(Number),pg=D.pag.filter(x=>x.f.startsWith(mes)).sort((a,b)=>a.f<b.f?1:-1),t=pg.reduce((s,x)=>s+x.m,0);
-  return `<div class="r" style="margin-bottom:10px"><button style="width:56px;margin:0" onclick="mv(-1)">‹</button><b>${NM[m-1]} ${y}</b><button style="width:56px;margin:0" onclick="mv(1)">›</button></div><div class="cd"><div class="m">Cobrado en el mes</div><div class="big pos">${fm(t)}</div><div class="m">${pg.length} pago(s)</div></div>`+pg.map(x=>`<div class="cd r"><div><b>${esc(x.o)}</b><div class="m">${fd(x.f)} · ${esc(x.p)}${x.md?' · '+esc(x.md):''}</div></div><b>${fm(x.m)}</b></div>`).join('')+(sin.length?vacioL('Para guardar el pago en cada pedido, agregá en tu Excel las columnas '+sin.join(' y ')+'.'):'')}
+  return `<div class="r" style="margin-bottom:10px"><button style="width:56px;margin:0" onclick="mv(-1)">‹</button><b>${NM[m-1]} ${y}</b><button style="width:56px;margin:0" onclick="mv(1)">›</button></div><div class="cd"><div class="m">Cobrado en el mes</div><div class="big pos">${fm(t)}</div><div class="m">${pg.length} pago(s)</div></div>`+
+  pg.map(x=>`<div class="cd r" onclick="delPag(${x.rP||0},'${esc(x.o)}','${esc(x.p)}',${x.m})"><div><b>${esc(x.o)}</b><div class="m">${fd(x.f)} · ${esc(x.p)}${x.md?' · '+esc(x.md):''}</div></div><div style="text-align:right"><b>${fm(x.m)}</b><div class="m" style="color:var(--bad);font-size:11px">Tocá para borrar 🗑</div></div></div>`).join('')+
+  (sin.length?vacioL('Para guardar el pago en cada pedido, agregá en tu Excel las columnas '+sin.join(' y ')+'.'):'')}
  return `<h2>Inventario</h2><input placeholder="Buscar…" oninput="bus(this.value)">`+D.inv.map((x,i)=>`<div class="cd ci" data-s="${esc((x.nom+' '+x.mat).toLowerCase())}" onclick="edI(${i})"><div class="r"><b>${esc(x.nom)}</b><span class="ch c4" style="margin:0">${esc(x.mat)}</span></div><div class="m">${esc(x.can)}${x.pre?' · '+fm(x.pre):''}${x.fec?' · '+fd(x.fec):''}</div></div>`).join('')}
 const NM=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 function bus(v){v=v.toLowerCase();document.querySelectorAll('.ci').forEach(e=>e.style.display=e.dataset.s.includes(v)?'':'none')}
@@ -81,30 +86,31 @@ function render(){document.querySelectorAll('nav button').forEach(b=>b.classList
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.v;render();scrollTo(0,0)});
 
 const cerrar=()=>{document.body.style.overflow='';$('#ov').classList.remove('on');$('#ov').innerHTML=''},abrir=h=>{document.body.style.overflow='hidden';$('#ov').innerHTML=`<div class="sh">${h}</div>`;$('#ov').classList.add('on');$('#ov').scrollTop=0};
-const sel=(id,a,v)=>{const curVal=v||a[0];return `<select id="${id}">${a.map(x=>`<option value="${esc(x)}" ${x==curVal?'selected':''}>${esc(x)}</option>`).join('')}</select>`},inp=(l,id,v,t,x)=>`<label>${l}</label><input id="${id}" type="${t||'text'}" value="${esc(v)}" ${x||''}>`;
+const sel=(id,a,v,ph)=>{const hasVal=v!==''&&v!=null;const opts=a.map(x=>`<option value="${esc(x)}" ${hasVal&&x==v?'selected':''}>${esc(x)}</option>`).join('');const phOpt=`<option value="" ${!hasVal?'selected disabled':''}>${esc(ph||'-- Seleccionar --')}</option>`;return `<select id="${id}">${phOpt}${opts}</select>`};
+const inp=(l,id,v,t,x)=>`<label>${l}</label><input id="${id}" type="${t||'text'}" value="${esc(v)}" ${x||''}>`;
 const ix=o=>D.ped.findIndex(x=>x.r==o.r&&x.p==o.p&&x.o==o.o),key=o=>o.p+'|'+o.o;
 
-function ed(i){const nw=i<0,o=nw?{p:'',o:'',e:'No iniciada',en:'Pendiente',pa:'Pendiente',fe:'',c:'Efectivo',h:'',m:'Alpaca',pm:'',pc:'',n:''}:{...D.ped[i]};
+function ed(i){const nw=i<0,o=nw?{p:'',o:'',e:'',en:'',pa:'',fe:'',c:'',h:'',m:'',pm:'',pc:'',n:''}:{...D.ped[i]};
  if(!nw&&!o.r){toast('Se está enviando, esperá un momento');return}
  cur={nw,o};const ows=[...new Set(D.ped.map(x=>x.o).filter(Boolean))];
  abrir(`<h3 style="margin:0 0 12px">${nw?'Nuevo pedido':esc(o.p)}</h3>${inp('Proyecto','f_p',o.p)}${inp('Propietario / Cliente','f_o',o.o,'text','list="dl"')}<datalist id="dl">${ows.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`+
  (nw?`<label style="display:flex;align-items:center;margin-bottom:12px"><input type="checkbox" id="f_st" style="width:auto;height:auto;margin-right:8px"> Es para stock (sin cliente)</label>`:'')+
- `<label>Estado</label>${sel('f_e',ES,o.e)}<label>Entrega</label>${sel('f_en',EN,o.en||'Pendiente')}<label>Pago</label>${sel('f_pa',PA,o.pa||'Pendiente')}${inp('Fecha de entrega','f_fe',o.fe,'date')}
+ `<label>Estado</label>${sel('f_e',ES,o.e,'Seleccionar estado')}<label>Entrega</label>${sel('f_en',EN,o.en,'Seleccionar entrega')}<label>Pago</label>${sel('f_pa',PA,o.pa,'Seleccionar pago')}${inp('Fecha de entrega','f_fe',o.fe,'date')}
  ${inp('Horas de producción','f_h',o.h,'number','step="0.5" inputmode="decimal" oninput="pv()"')}${nw?'':'<div id="tkb" class="cd" style="background:#0c0a09">'+tkH()+'</div>'}
- <label>Material</label>${sel('f_m',MATS,o.m||'Alpaca')}
- ${inp('Precio material + packaging ($)','f_pm',o.pm,'number','inputmode="decimal" oninput="pv()"')}<div class="m" id="pv" style="margin:-4px 0 10px"></div>
- ${inp('Precio final cobrado ($)','f_pc',o.pc,'number','inputmode="decimal"')}
- <label>Medio de pago preferido</label>${sel('f_c',MD,o.c||'Efectivo')}<label>Notas</label><textarea id="f_n">${esc(o.n)}</textarea>
+ <label>Material</label>${sel('f_m',MATS,o.m,'Seleccionar material')}
+ ${inp('Precio material + packaging ($)','f_pm',o.pm?fmtNum(o.pm):'','text','inputmode="numeric" oninput="fmtInp(this);pv()"')}<div class="m" id="pv" style="margin:-4px 0 10px"></div>
+ ${inp('Precio final cobrado ($)','f_pc',o.pc?fmtNum(o.pc):'','text','inputmode="numeric"')}
+ <label>Medio de pago preferido</label>${sel('f_c',MD,o.c,'Seleccionar medio')}<label>Notas</label><textarea id="f_n">${esc(o.n)}</textarea>
  <button class="pri" onclick="sv()">Guardar</button>
  ${!nw?pgH(o):''}
  ${!nw?`<button class="danger" onclick="delP()">Borrar pedido</button>`:''}
  <button onclick="cerrar()">Cancelar</button>`);pv()}
 
-function pv(){const h=+$('#f_h').value||0,m=+$('#f_pm').value||0;$('#pv').textContent=cfg.ph?`Mano de obra ${fm(h*cfg.ph)} · Sugerido ${fm(h*cfg.ph+m)}`:''}
-const gv=()=>{const g=id=>$('#'+id).value;return{p:g('f_p').trim(),o:g('f_o').trim(),e:g('f_e'),en:g('f_en'),pa:g('f_pa'),fe:g('f_fe'),c:g('f_c'),h:g('f_h'),m:g('f_m'),pm:g('f_pm'),pc:g('f_pc'),n:g('f_n')}};
+function pv(){const h=+$('#f_h').value||0,m=parseNum($('#f_pm').value);$('#pv').textContent=cfg.ph?`Mano de obra ${fm(h*cfg.ph)} · Sugerido ${fm(h*cfg.ph+m)}`:''}
+const gv=()=>{const g=id=>$('#'+id).value;return{p:g('f_p').trim(),o:g('f_o').trim(),e:g('f_e'),en:g('f_en'),pa:g('f_pa'),fe:g('f_fe'),c:g('f_c'),h:g('f_h'),m:g('f_m'),pm:parseNum(g('f_pm')),pc:parseNum(g('f_pc')),n:g('f_n')}};
 
 function sv(){const v=gv();if(!v.p){toast('Falta el proyecto');return}
- if(cur.nw){if($('#f_st')&&$('#f_st').checked){v.o=v.o||'Stock';v.en='Pendiente';v.pa='Pendiente'}if(+cfg.pk)v.pm=(+v.pm||0)+(+cfg.pk);q.push({a:'nuevo',id:uid(),c:v});D.ped.push({...v,r:0,mr:''})}
+ if(cur.nw){if($('#f_st')&&$('#f_st').checked){v.o=v.o||'Stock';if(!v.en)v.en='Pendiente';if(!v.pa)v.pa='Pendiente'}if(+cfg.pk)v.pm=(+v.pm||0)+(+cfg.pk);q.push({a:'nuevo',id:uid(),c:v});D.ped.push({...v,r:0,mr:''})}
  else{const o=cur.o,c={};for(const k in v)if(String(v[k]??'')!==String(o[k]??''))c[k]=v[k];
   if(Object.keys(c).length){q.push({a:'editar',id:uid(),r:o.r,ver:[o.p,o.o],c});const i=ix(o);if(i>=0)Object.assign(D.ped[i],c)}}
  S('q',q);S('D',D);cerrar();render();sync()}
@@ -113,17 +119,23 @@ function delP(){if(!confirm('¿Seguro que querés borrar este pedido de la lista
  const o=cur.o;q.push({a:'borrar',id:uid(),r:o.r,ver:[o.p,o.o]});const i=ix(o);if(i>=0)D.ped.splice(i,1);
  S('q',q);S('D',D);cerrar();render();sync()}
 
+function delPag(rP,o,p,m){if(!confirm(`¿Borrar el pago de ${fm(m)} registrado para ${o} (${p})?`))return;
+ q.push({a:'borrarPago',id:uid(),rP:+rP||0,o,p,m});
+ const idxP=D.pag.findIndex(x=>(rP&&x.rP==rP)||(x.o==o&&x.p==p&&x.m==m));if(idxP>=0)D.pag.splice(idxP,1);
+ const i=D.ped.findIndex(x=>x.o==o&&x.p==p);if(i>=0){const ped=D.ped[i];ped.mr=Math.max(0,(+ped.mr||0)-m);const tot=precioTot(ped);ped.pa=ped.mr<=0?'Pendiente':(ped.mr>=tot?'Hecha':'Parcial')}
+ S('q',q);S('D',D);render();sync()}
+
 function pgH(o){
  const rec=+o.mr||0,tot=precioTot(o),r=rest(o);
  return `<div class="cd" style="background:#0c0a09;margin-top:10px">
   <b>Registrar Pago</b>
   <div class="m" style="margin:4px 0 8px">Cobrado: <b>${fm(rec)}</b> / ${fm(tot)} · <b class="neg">Deuda: ${fm(r)}</b></div>
-  <label>Monto a ingresar ($)</label><input id="pg_m" type="number" inputmode="decimal" value="${r||''}">
-  <label>Medio</label>${sel('pg_md',MD,o.c||'Efectivo')}
+  <label>Monto a ingresar ($)</label><input id="pg_m" type="text" inputmode="numeric" value="${r?fmtNum(r):''}" oninput="fmtInp(this)">
+  <label>Medio</label>${sel('pg_md',MD,o.c,'Seleccionar medio')}
   <button class="pri" style="margin-top:6px" onclick="pg()">Registrar cobro</button>
  </div>`}
 
-function pg(){const o=cur.o,m=+$('#pg_m').value;if(!m){toast('Ingresá el monto');return}
+function pg(){const o=cur.o,m=parseNum($('#pg_m').value);if(!m){toast('Ingresá el monto');return}
  const md=$('#pg_md').value,rec=(+o.mr||0)+m,tot=precioTot(o),saldado=rec>=tot;
  q.push({a:'pago',id:uid(),r:o.r,ver:[o.p,o.o],monto:m,medio:md,fecha:hoy(),saldado});
  const i=ix(o);if(i>=0){const p=D.ped[i];p.pa=saldado?'Hecha':'Parcial';p.mr=rec;if(md)p.c=md}
@@ -140,17 +152,17 @@ function tkSum(k){const o=cur.o,t=timers[k]||{acc:0,st:null},ms=t.acc+(t.st?Date
 
 setInterval(()=>{const e=$('#tk');if(e&&cur&&cur.o){const k=key(cur.o),t=timers[k];if(t&&t.st)e.textContent=hms(t.acc+(Date.now()-t.st))}},1000);
 
-function edI(i){const nw=i<0,o=nw?{nom:'',mat:'Alpaca',can:'',pre:'',fec:hoy()}:{...D.inv[i]};cur={nw,o};
- abrir(`<h3 style="margin:0 0 12px">${nw?'Nuevo material':esc(o.nom)}</h3>${inp('Nombre','i_n',o.nom)}<label>Material</label>${sel('i_m',MATS,o.mat||'Alpaca')}${inp('Cantidad aproximada','i_c',o.can)}${inp('Precio de compra ($)','i_p',o.pre||'','number','inputmode="decimal"')}${inp('Fecha de compra','i_f',o.fec,'date')}<button class="pri" onclick="svI()">Guardar</button><button onclick="cerrar()">Cancelar</button>`)}
-function svI(){const v={nom:$('#i_n').value.trim(),mat:$('#i_m').value,can:$('#i_c').value.trim(),pre:$('#i_p').value,fec:$('#i_f').value};if(!v.nom){toast('Falta el nombre');return}
+function edI(i){const nw=i<0,o=nw?{nom:'',mat:'',can:'',pre:'',fec:hoy()}:{...D.inv[i]};cur={nw,o};
+ abrir(`<h3 style="margin:0 0 12px">${nw?'Nuevo material':esc(o.nom)}</h3>${inp('Nombre','i_n',o.nom)}<label>Material</label>${sel('i_m',MATS,o.mat,'Seleccionar material')}${inp('Cantidad aproximada','i_c',o.can)}${inp('Precio de compra ($)','i_p',o.pre?fmtNum(o.pre):'','text','inputmode="numeric" oninput="fmtInp(this)"')}${inp('Fecha de compra','i_f',o.fec,'date')}<button class="pri" onclick="svI()">Guardar</button><button onclick="cerrar()">Cancelar</button>`)}
+function svI(){const v={nom:$('#i_n').value.trim(),mat:$('#i_m').value,can:$('#i_c').value.trim(),pre:parseNum($('#i_p').value),fec:$('#i_f').value};if(!v.nom){toast('Falta el nombre');return}
  if(cur.nw){q.push({a:'invnuevo',id:uid(),c:v});D.inv.push({r:0,...v,pre:+v.pre||0})}
  else{const o=cur.o,c={};for(const k in v)if(String(v[k])!==String(o[k]||''))c[k]=v[k];
   if(Object.keys(c).length){q.push({a:'inveditar',id:uid(),r:o.r,ver:o.nom,c});const i=D.inv.findIndex(x=>x.r==o.r&&x.nom==o.nom);if(i>=0)Object.assign(D.inv[i],c,c.pre!==undefined?{pre:+c.pre||0}:{})}}
  S('q',q);S('D',D);cerrar();render();sync()}
 
 $('#fab').onclick=()=>tab=='i'?edI(-1):ed(-1);
-$('#gear').onclick=()=>{abrir(`<h3 style="margin:0 0 12px">Ajustes</h3><div class="m" style="margin-bottom:10px">Se guardan solo en este teléfono.</div>${inp('URL de la app web (termina en /exec)','s_u',cfg.url||'')}${inp('Clave','s_k',cfg.t||'','password')}${inp('Valor de tu hora ($)','s_h',cfg.ph||'','number','inputmode="decimal"')}${inp('Packaging ($)','s_p',cfg.pk||0,'number','inputmode="decimal"')}<button class="pri" onclick="gc()">Guardar</button><button onclick="cerrar()">Cancelar</button>`)};
-function gc(){cfg={url:$('#s_u').value.trim(),t:$('#s_k').value.trim(),ph:+$('#s_h').value||0,pk:+$('#s_p').value||0};S('cfg',cfg);cerrar();toast('Guardado');render();sync();cargar()}
+$('#gear').onclick=()=>{abrir(`<h3 style="margin:0 0 12px">Ajustes</h3><div class="m" style="margin-bottom:10px">Se guardan solo en este teléfono.</div>${inp('URL de la app web (termina en /exec)','s_u',cfg.url||'')}${inp('Clave','s_k',cfg.t||'','password')}${inp('Valor de tu hora ($)','s_h',cfg.ph?fmtNum(cfg.ph):'','text','inputmode="numeric" oninput="fmtInp(this)"')}${inp('Packaging ($)','s_p',cfg.pk?fmtNum(cfg.pk):'$ 0','text','inputmode="numeric" oninput="fmtInp(this)"')}<button class="pri" onclick="gc()">Guardar</button><button onclick="cerrar()">Cancelar</button>`)};
+function gc(){cfg={url:$('#s_u').value.trim(),t:$('#s_k').value.trim(),ph:parseNum($('#s_h').value),pk:parseNum($('#s_p').value)};S('cfg',cfg);cerrar();toast('Guardado');render();sync();cargar()}
 async function api(b){const r=await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({...b,t:cfg.t})});return r.json()}
 async function cargar(){if(!cfg.url||!navigator.onLine)return;try{const r=await(await fetch(cfg.url+'?t='+encodeURIComponent(cfg.t))).json();if(r.ok&&!q.length){D={ped:r.ped,inv:r.inv,pag:r.pag};sin=r.sin||[];S('D',D);S('sin',sin);err='';render()}else if(r.error){err=r.error;render()}}catch(e){}}
 async function sync(){if(busy||!cfg.url||!navigator.onLine)return;busy=1;err='';
